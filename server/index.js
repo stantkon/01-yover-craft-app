@@ -15,19 +15,36 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Папка для хранения всех пользовательских папок
+const usersFolderPath = path.join(__dirname, 'UsersFolder');
+
+// Создаем папку UsersFolder, если она не существует
+if (!fs.existsSync(usersFolderPath)) {
+    fs.mkdirSync(usersFolderPath);
+}
+
 // Настройка хранилища для multer
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        const folderName = req.body.folderName || 'default_folder';
-        const folderPath = path.join(__dirname, folderName);
-
-        if (!fs.existsSync(folderPath)) {
-            fs.mkdirSync(folderPath, { recursive: true });
+        // Получаем имя пользователя (папку)
+        const userFolderName = req.body.folderName;  // Имя папки от пользователя
+        if (!userFolderName) {
+            return cb(new Error('Имя папки пользователя не указано'));
         }
 
-        cb(null, folderPath);
+        // Путь к папке пользователя в папке UsersFolder
+        const userFolderPath = path.join(usersFolderPath, userFolderName);
+
+        // Если папки нет, создаем её
+        if (!fs.existsSync(userFolderPath)) {
+            fs.mkdirSync(userFolderPath, { recursive: true });
+        }
+
+        // Указываем путь, куда сохранять файл
+        cb(null, userFolderPath);
     },
     filename: function (req, file, cb) {
+        // Сохраняем файл с оригинальным именем
         cb(null, file.originalname);
     }
 });
@@ -36,11 +53,12 @@ const upload = multer({ storage: storage });
 
 // Маршрут для загрузки файлов
 app.post('/upload', upload.array('files'), (req, res) => {
-    const folderName = req.body.folderName || 'default_folder';
+    const userFolderName = req.body.folderName;
 
+    // Если файлы были загружены
     if (req.files) {
         res.send({
-            message: `Файлы успешно загружены в папку: ${folderName}`,
+            message: `Файлы успешно загружены в папку пользователя: ${userFolderName}`,
             files: req.files
         });
     } else {
